@@ -137,6 +137,35 @@ body {
   border-bottom: 1px solid var(--border-color);
 }
 
+/* Abstract: hidden until user scrolls (keeps embed focused on video) */
+.abstract-section .abstract-heading,
+.abstract-section .abstract-body {
+  opacity: 0;
+  transform: translateY(1.25rem);
+  transition: opacity 0.55s cubic-bezier(0.4, 0, 0.2, 1),
+              transform 0.55s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.abstract-section.is-revealed .abstract-heading {
+  opacity: 1;
+  transform: none;
+}
+
+.abstract-section.is-revealed .abstract-body {
+  opacity: 1;
+  transform: none;
+  transition-delay: 0.1s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .abstract-section .abstract-heading,
+  .abstract-section .abstract-body {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
 .hero-body {
   padding: 4rem 1.5rem;
 }
