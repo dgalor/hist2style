@@ -122,24 +122,43 @@ function setupVideoCarouselAutoplay() {
     });
 }
 
-$(document).ready(function() {
-    // Check for click events on the navbar burger icon
+function setupYouTubeEmbed() {
+    var iframe = document.getElementById('youtube-embed');
+    var fallback = document.getElementById('youtube-fallback');
+    var hint = document.getElementById('video-local-hint');
+    if (!iframe) return;
 
-    var options = {
-		slidesToScroll: 1,
-		slidesToShow: 1,
-		loop: true,
-		infinite: true,
-		autoplay: true,
-		autoplaySpeed: 5000,
+    var embedSrc = iframe.getAttribute('data-src');
+    if (!embedSrc) return;
+
+    if (window.location.protocol === 'file:') {
+        iframe.remove();
+        if (fallback) fallback.classList.remove('is-hidden');
+        if (hint) hint.classList.remove('is-hidden');
+        return;
     }
 
-	// Initialize all div with carousel class
-    var carousels = bulmaCarousel.attach('.carousel', options);
-	
-    bulmaSlider.attach();
-    
-    // Setup video autoplay for carousel
-    setupVideoCarouselAutoplay();
+    iframe.src = embedSrc;
+}
 
-})
+document.addEventListener('DOMContentLoaded', function() {
+    setupYouTubeEmbed();
+    var carouselOptions = {
+        slidesToScroll: 1,
+        slidesToShow: 1,
+        loop: true,
+        infinite: true,
+        autoplay: true,
+        autoplaySpeed: 5000,
+    };
+
+    if (typeof bulmaCarousel !== 'undefined' && document.querySelector('.carousel')) {
+        bulmaCarousel.attach('.carousel', carouselOptions);
+    }
+
+    if (typeof bulmaSlider !== 'undefined' && document.querySelector('input[type="range"].slider')) {
+        bulmaSlider.attach();
+    }
+
+    setupVideoCarouselAutoplay();
+});

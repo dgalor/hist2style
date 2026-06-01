@@ -78,8 +78,46 @@ body {
     transform: translateY(-2px);
 }
 
+.publication-links {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: center;
+  gap: 0.65rem 0.85rem;
+  margin-top: 0.5rem;
+}
+
+.publication-links .link-block {
+  margin: 0;
+}
+
 .link-block a {
     margin: 8px 4px;
+}
+
+.publication-links .link-block a {
+  margin: 0;
+  min-width: 7.25rem;
+}
+
+/* Bulma .icon defaults to gray; inherit button color on dark hero links */
+.button.is-dark .icon,
+.button.is-dark .icon i {
+  color: currentColor;
+}
+
+.button .icon i[class*="fa-"] {
+  display: inline-block;
+  font-size: 1em;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+/* .button { font-weight: 600 !important } breaks FA solid icons without 900 */
+.button .icon .fa-solid,
+.copy-bibtex-btn .fa-solid,
+.scroll-to-top .fa-solid {
+  font-weight: 900 !important;
 }
 
 .dnerf {
@@ -118,7 +156,7 @@ body {
     font-family: 'Inter', sans-serif !important;
     font-weight: 800 !important;
     color: var(--text-primary) !important;
-    margin-bottom: 2rem !important;
+    margin-bottom: 1rem !important;
     line-height: 1.1 !important;
 }
 
@@ -151,15 +189,51 @@ body {
     margin-bottom: 1.5rem;
 }
 
-.publication-venue {
+.publication-authors-names {
+    white-space: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    margin-bottom: 0;
+}
+
+.hero .publication-authors-names {
+    margin-top: 0.75rem;
+}
+
+.publication-authors-names .author-block {
+    margin-right: 0;
+}
+
+.hero .publication-authors-affiliations {
+    margin-top: 0.35rem;
+    margin-bottom: 0;
     color: var(--text-secondary);
-    width: fit-content;
+}
+
+.hero .publication-links {
+    margin-top: 1.25rem;
+}
+
+.publication-links .publication-venue {
+    color: var(--text-secondary);
     font-weight: 600;
     background: var(--background-accent);
     padding: 0.5rem 1rem;
     border-radius: var(--border-radius);
-    margin-top: 1rem;
-    display: inline-block;
+    margin: 0;
+    flex-shrink: 0;
+    line-height: 1.5;
+    white-space: nowrap;
+    text-decoration: none;
+    border: 1px solid transparent;
+    transition: var(--transition);
+}
+
+.publication-links .publication-venue:hover {
+    color: var(--primary-color);
+    background: #e0f2fe;
+    border-color: #bae6fd;
 }
 
 .publication-awards {
@@ -233,13 +307,86 @@ body {
     box-shadow: var(--shadow-xl);
 }
 
-.publication-video iframe {
+.publication-video iframe,
+.publication-video .video-fallback {
     position: absolute;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
+    border: 0;
     border-radius: var(--border-radius-lg);
+}
+
+.video-fallback {
+    display: block;
+    overflow: hidden;
+    color: inherit;
+    text-decoration: none;
+}
+
+.video-fallback img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    transition: var(--transition);
+}
+
+.video-fallback:hover img {
+    transform: scale(1.03);
+    filter: brightness(0.92);
+}
+
+.video-play-button {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 1rem 1.5rem;
+    border-radius: var(--border-radius-lg);
+    background: rgba(15, 23, 42, 0.82);
+    color: #fff;
+    font-weight: 700;
+    box-shadow: var(--shadow-lg);
+    transition: var(--transition);
+}
+
+.video-play-button .fa-brands {
+    font-size: 2rem;
+}
+
+.video-fallback:hover .video-play-button {
+    background: var(--primary-color);
+    transform: translate(-50%, -50%) scale(1.05);
+}
+
+.video-local-hint {
+    margin-top: 1rem;
+    padding: 0.85rem 1rem;
+    border-radius: var(--border-radius);
+    background: var(--background-accent);
+    color: var(--text-secondary);
+    font-size: 0.95rem;
+    border: 1px solid var(--border-color);
+}
+
+.video-local-hint code {
+    font-size: 0.88em;
+    color: var(--text-primary);
+}
+
+.hero:has(+ .video-section) .hero-body {
+  padding-top: 2rem;
+  padding-bottom: 1rem;
+}
+
+.video-section {
+  padding-top: 1rem;
+  padding-bottom: 2.5rem;
 }
 
 .publication-body img {
