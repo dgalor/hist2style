@@ -1,0 +1,1514 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Hist2Style — Histogram Editor</title>
+<style>
+:root{ --bg:#0b0b0c; --card:#141517; --line:#23252a; --fg:#f6f7f9; --muted:#9aa0aa; }
+*{ box-sizing:border-box } body{ margin:0; padding:16px; background:var(--bg); color:var(--fg); font-family: ui-sans-serif,system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial }
+.container{ max-width: none; margin: 0 auto; display:grid; gap:16px }
+.row{ display:grid; grid-template-columns: minmax(0, 1fr) clamp(340px, 28vw, 460px); gap:16px; align-items:start }
+@media (max-width:900px){ .row{ grid-template-columns:1fr } }
+.card{ background:var(--card); border:1px solid var(--line); border-radius:10px; padding:12px }
+.toolbar{ display:flex; gap:12px; align-items:center; justify-content:space-between; margin-bottom:8px; flex-wrap:wrap }
+button,.file{ padding:8px 12px; background:#1f2430; color:white; border:1px solid #2c3446; border-radius:8px; cursor:pointer }
+.small{ font-size:12px; color:var(--muted) }
+.small[id$="Val"]{ display:inline-block; min-width:48px; text-align:right; font-variant-numeric:tabular-nums }
+.hrow{ display:grid; grid-template-columns:1fr; gap:12px }
+.chan{ display:grid; grid-template-columns:24px 1fr; align-items:start; gap:10px }
+.chan label{ text-transform:uppercase; font-size:12px; color:var(--muted); margin-top:4px }
+.hist-container{ display:flex; flex-direction:column; width:100% }
+img{ width:100%; height:auto; display:block; border-radius:10px; border:1px solid var(--line); background:#0f1012 }
+#previewEdited{ opacity:0; transition:opacity 0.2s }
+canvas:not([id^="colorbar"]){ width:100%; height:168px; display:block; border-radius:8px 8px 0 0; border:1px solid var(--line); border-bottom:none; background:#101114; opacity:0; transition:opacity 0.1s }
+canvas[id^="colorbar"]{ width:100%; height:8px; display:block; margin-top:0; border-radius:0 0 8px 8px; border:1px solid var(--line); border-top:none; background:#101114 }
+input[type="range"]{ width:200px }
+.pill{ padding:6px 10px; border-radius:999px; background:#1a1c20; border:1px solid #2d3342 }
+.imggrid{ display:grid; grid-template-columns: 1fr 1fr; gap:12px }
+@media (max-width:900px){ .imggrid{ grid-template-columns:1fr } }
+.imglabel{ font-size:12px; color:var(--muted); margin:0 0 6px 2px; letter-spacing:.02em; text-transform:uppercase }
+.row > .card:last-child{ position: sticky; top: 16px; height: fit-content; }
+.imggrid img{ width: 100%; height: auto; object-fit: contain; }
+canvas{ width: 100%; }
+
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="row">
+    <div class="card">
+      <div class="toolbar">
+        <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap">
+          <label class="pill">
+            <input type="checkbox" id="menuCheck" style="position:absolute; opacity:0; pointer-events:none;" checked/>
+            Menu
+          </label>
+          <input id="file" class="file" type="file" accept="image/*" />
+          <input id="refFile" class="file" type="file" accept="image/*" title="Reference"/>
+          <button id="undo">Undo</button>
+          <button id="redo">Redo</button>
+          <button id="swapOR" title="Swap Original ↔ Reference">Swap O↔R</button>
+          <button id="resetAll">Reset all</button>
+          <button id="applyBtn">Apply</button>
+          <span id="status" class="small">Idle</span>
+        </div>
+        
+        <div style="flex-basis: 100%; height: 0;"></div>
+        <div style="display:flex; align-items:center; flex-wrap:wrap; justify-content:center;">
+          <div style="display:inline-flex; flex-direction:column; gap:8px; align-items:flex-end;">
+            <div style="display:flex; gap:8px; align-items:center;">
+              <input id="numPts" type="range" min="8" max="128" step="1" value="128" />
+              <span id="numPtsLabel" class="small">Brush σ (px)</span>
+              <input id="sigmaPx" type="range" min="5" max="200" step="1" value="60" />
+              <span id="sigmaPxVal" class="small">60</span>
+            </div>
+          
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span id="maxPixelsLabel" class="small">MaxPx</span>
+              <input id="maxPixels" type="range" min="50000" max="10000000" step="50000" value="1000000" />
+              <span id="maxPixelsVal" class="small">1.0M</span>
+            </div>
+          
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span id="qualityLabel" class="small">Quality</span>
+              <input id="quality" type="range" min="1" max="100" step="1" value="92" />
+              <span id="qualityVal" class="small">92</span>
+            </div>
+
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span id="numItersLabel" class="small">NumIters</span>
+              <input id="numIters" type="range" min="1" max="10" step="1" value="1" />
+              <span id="numItersVal" class="small">1</span>
+            </div>
+
+            <div style="display:flex; gap:8px; align-items:center;">
+            </div>
+          
+            <div style="display:flex; gap:8px; align-items:center;">
+              <label class="pill"><input id="clamp0" type="checkbox" checked/> Clamp ≥ 0</label>
+              <label class="pill"><input id="preserveMass" type="checkbox" checked/> Preserve mass</label>
+            </div>
+          </div>
+        </div>
+        
+      </div>
+
+      <div class="imggrid">
+        <div>
+          <div class="imglabel">Original</div>
+          <div class="hdrjpg" data-mp4-src="">
+            <picture>
+              <source type="image/avif" />
+              <img id="previewOriginal" alt="Original" style="image-rendering: -webkit-optimize-contrast;" />
+            </picture>
+          </div>
+
+          <div id="referenceBlock" style="display:none; margin-top:8px">
+            <div class="imglabel">Reference</div>
+            <img id="previewReference" alt="Reference (hist only)" />
+          </div>
+        </div>
+
+        <div>
+          <div class="imglabel">Edited</div>
+          <img id="previewEdited" alt="Edited" />
+
+          <div id="editedSdrBlock" style="display:none; margin-top:8px">
+            <div class="imglabel">Edited (SDR preview)</div>
+            <img id="previewEditedSDR" alt="Edited SDR" />
+          </div>
+        </div>
+        
+      </div>
+
+    </div>
+
+    <div class="card">
+      <div class="hrow">
+        <div class="chan"><label>Y'</label><div class="hist-container"><canvas id="histR" width="512" height="168"></canvas><canvas id="colorbarR" width="512" height="8"></canvas></div></div>
+        <div class="chan"><label>Cb</label><div class="hist-container"><canvas id="histG" width="512" height="168"></canvas><canvas id="colorbarG" width="512" height="8"></canvas></div></div>
+        <div class="chan"><label>Cr</label><div class="hist-container"><canvas id="histB" width="512" height="168"></canvas><canvas id="colorbarB" width="512" height="8"></canvas></div></div>
+      </div>
+      
+      <div style="margin-top:12px; padding:8px; background:#1a1c20; border-radius:6px; border:1px solid #2d3342;">
+        <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; justify-content:center;">
+          <div style="display:inline-flex; flex-direction:column; gap:8px; align-items:flex-end;">
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span class="small">Exposure</span>
+              <input id="exposure" type="range" min="0.1" max="3.0" step="0.01" value="1.0" />
+              <span id="exposureVal" class="small">1.00</span>
+            </div>
+
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span class="small">U-Shift</span>
+              <input id="ushift" type="range" min="-1" max="1.0" step="0.01" value="0.0" />
+              <span id="ushiftVal" class="small">0.00</span>
+            </div>
+
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span class="small">V-Shift</span>
+              <input id="vshift" type="range" min="-1" max="1.0" step="0.01" value="0.0" />
+              <span id="vshiftVal" class="small">0.00</span>
+            </div>
+          
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span class="small">Contrast</span>
+              <input id="contrast" type="range" min="0.0" max="2.0" step="0.01" value="1.0" />
+              <span id="contrastVal" class="small">1.00</span>
+            </div>
+          
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span class="small">Shadows</span>
+              <input id="shadows" type="range" min="-100" max="100" step="1" value="0" />
+              <span id="shadowsVal" class="small">0.00</span>
+            </div>
+
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span class="small">Highlights</span>
+              <input id="highlights" type="range" min="-100" max="100" step="1" value="0" />
+              <span id="highlightsVal" class="small">0.00</span>
+            </div>
+
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span class="small">Smoothing</span>
+              <input id="smoothing" type="range" min="0" max="1" step="0.01" value="0.05" />
+              <span id="smoothingVal" class="small">0.05</span>
+            </div>
+
+            <div style="display:flex; gap:8px; align-items:center;">
+              <span id="amountLabel" class="small">Amount</span>
+              <input id="amount" type="range" min="-3.0" max="3.0" step="0.1" value="1.0" />
+              <span id="amountVal" class="small">1.00</span>
+            </div>
+          </div>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+  const imgOrigEl = document.getElementById('previewOriginal');
+  const imgEditEl = document.getElementById('previewEdited');
+  const imgRefEl  = document.getElementById('previewReference');
+  const fileEl = document.getElementById('file');
+  const refFileEl = document.getElementById('refFile');
+  const statusEl = document.getElementById('status');
+  const resetAllEl = document.getElementById('resetAll');
+  const undoEl = document.getElementById('undo');
+  const redoEl = document.getElementById('redo');
+  const sigmaPxEl = document.getElementById('sigmaPx');
+  const sigmaPxValEl = document.getElementById('sigmaPxVal');
+  const numPtsEl = document.getElementById('numPts');
+  const clamp0El = document.getElementById('clamp0');
+  const preserveMassEl = document.getElementById('preserveMass');
+  const testSummaryEl = document.getElementById('testSummary');
+  const testOutputEl = document.getElementById('testOutput');
+  const editedSdrBlockEl = document.getElementById('editedSdrBlock');
+  const imgEditSdrEl     = document.getElementById('previewEditedSDR');
+  const maxPixelsEl   = document.getElementById('maxPixels');
+  const maxPixelsValEl= document.getElementById('maxPixelsVal');
+  const qualityEl = document.getElementById('quality');
+  const qualityValEl = document.getElementById('qualityVal');
+  const applyBtnEl = document.getElementById('applyBtn');
+  const swapEl = document.getElementById('swapOR');
+  const creativeEl = document.getElementById('creative');
+  const creativeValEl = document.getElementById('creativeVal');
+  const amountEl = document.getElementById('amount');
+  const amountValEl = document.getElementById('amountVal');
+  const smoothingEl = document.getElementById('smoothing');
+  const smoothingValEl = document.getElementById('smoothingVal');
+  const exposureEl = document.getElementById('exposure');
+  const exposureValEl = document.getElementById('exposureVal');
+  const contrastEl = document.getElementById('contrast');
+  const contrastValEl = document.getElementById('contrastVal');
+  const shadowsEl = document.getElementById('shadows');
+  const shadowsValEl = document.getElementById('shadowsVal');
+  const highlightsEl = document.getElementById('highlights');
+  const highlightsValEl = document.getElementById('highlightsVal');
+  const numItersEl = document.getElementById('numIters');
+  const numItersValEl = document.getElementById('numItersVal');
+  const menuCheckEl = document.getElementById('menuCheck');
+  const numItersLabelEl = document.getElementById('numItersLabel');
+  const qualityLabelEl = document.getElementById('qualityLabel');
+  const maxPixelsLabelEl = document.getElementById('maxPixelsLabel');
+  const creativeLabelEl = document.getElementById('creativeLabel');
+  const amountLabelEl = document.getElementById('amountLabel');
+  const numPtsLabelEl = document.getElementById('numPtsLabel');
+  const ushiftEl = document.getElementById('ushift');
+  const ushiftValEl = document.getElementById('ushiftVal');
+  const vshiftEl = document.getElementById('vshift');
+  const vshiftValEl = document.getElementById('vshiftVal');
+  const referenceBlockEl = document.getElementById('referenceBlock');
+
+  if (undoEl) undoEl.style.display = 'none';
+  if (redoEl) redoEl.style.display = 'none';
+  if (numPtsEl) numPtsEl.style.display = 'none';
+  if (clamp0El && clamp0El.parentElement) clamp0El.parentElement.style.display = 'none';
+  if (preserveMassEl && preserveMassEl.parentElement) preserveMassEl.parentElement.style.display = 'none';
+  if (applyBtnEl) applyBtnEl.style.display = 'none';
+
+  if (menuCheckEl) menuCheckEl.addEventListener('change', ()=>{
+    if (!menuCheckEl.checked) {
+      if (sigmaPxEl) sigmaPxEl.style.display = 'none';
+      if (maxPixelsEl) maxPixelsEl.style.display = 'none';
+      if (qualityEl) qualityEl.style.display = 'none';
+      if (numItersEl) numItersEl.style.display = 'none';
+      if (creativeEl) creativeEl.style.display = 'none';
+      if (sigmaPxValEl) sigmaPxValEl.style.display = 'none';
+      if (maxPixelsValEl) maxPixelsValEl.style.display = 'none';
+      if (qualityValEl) qualityValEl.style.display = 'none';
+      if (numItersValEl) numItersValEl.style.display = 'none';
+      if (creativeValEl) creativeValEl.style.display = 'none';
+      if (numItersLabelEl) numItersLabelEl.style.display = 'none';
+      if (qualityLabelEl) qualityLabelEl.style.display = 'none';
+      if (maxPixelsLabelEl) maxPixelsLabelEl.style.display = 'none';
+      if (creativeLabelEl) creativeLabelEl.style.display = 'none';
+      if (numPtsLabelEl) numPtsLabelEl.style.display = 'none';
+    } else {
+      if (sigmaPxEl) sigmaPxEl.style.display = 'block';
+      if (maxPixelsEl) maxPixelsEl.style.display = 'block';
+      if (qualityEl) qualityEl.style.display = 'block';
+      if (numItersEl) numItersEl.style.display = 'block';
+      if (creativeEl) creativeEl.style.display = 'block';
+      if (sigmaPxValEl) sigmaPxValEl.style.display = 'block';
+      if (maxPixelsValEl) maxPixelsValEl.style.display = 'block';
+      if (qualityValEl) qualityValEl.style.display = 'block';
+      if (numItersValEl) numItersValEl.style.display = 'block';
+      if (creativeValEl) creativeValEl.style.display = 'block';
+      if (numItersLabelEl) numItersLabelEl.style.display = 'block';
+      if (qualityLabelEl) qualityLabelEl.style.display = 'block';
+      if (maxPixelsLabelEl) maxPixelsLabelEl.style.display = 'block';
+      if (creativeLabelEl) creativeLabelEl.style.display = 'block';
+      if (numPtsLabelEl) numPtsLabelEl.style.display = 'block';
+    }
+  });
+
+  function fmtMP(n){ return (n/1e6).toFixed(1) + 'M'; }
+    if (maxPixelsEl && maxPixelsValEl) {
+      maxPixelsValEl.textContent = fmtMP(parseInt(maxPixelsEl.value,10));
+      maxPixelsEl.addEventListener('input', ()=>{
+        maxPixelsValEl.textContent = fmtMP(parseInt(maxPixelsEl.value,10));
+        schedule();
+    });
+  }
+  if (qualityEl && qualityValEl) {
+    qualityValEl.textContent = qualityEl.value;
+    qualityEl.addEventListener('input', ()=>{
+      qualityValEl.textContent = qualityEl.value;
+      userTouchedQuality = true;
+      schedule();
+    });
+  }
+  if (creativeEl && creativeValEl) {
+    creativeValEl.textContent = creativeEl.value;
+    creativeEl.addEventListener('input', ()=>{
+      creativeValEl.textContent = creativeEl.value;
+      schedule();
+    });
+  }
+  if (amountEl && amountValEl) {
+    amountValEl.textContent = parseFloat(amountEl.value).toFixed(2);
+    amountEl.addEventListener('input', ()=>{
+      amountValEl.textContent = parseFloat(amountEl.value).toFixed(2);
+      schedule();
+    });
+  }
+  if (smoothingEl && smoothingValEl) {
+    smoothingValEl.textContent = parseFloat(smoothingEl.value).toFixed(2);
+    smoothingEl.addEventListener('input', ()=>{
+      smoothingValEl.textContent = parseFloat(smoothingEl.value).toFixed(2);
+      applyHistogramOperations();
+      redraw();
+      schedule();
+    });
+  }
+  if (exposureEl && exposureValEl) {
+    exposureValEl.textContent = parseFloat(exposureEl.value).toFixed(2);
+    exposureEl.addEventListener('input', ()=>{
+      exposureValEl.textContent = parseFloat(exposureEl.value).toFixed(2);
+      applyHistogramOperations();
+      redraw();
+      schedule();
+    });
+  }
+  if (contrastEl && contrastValEl) {
+    contrastValEl.textContent = parseFloat(contrastEl.value).toFixed(2);
+    contrastEl.addEventListener('input', ()=>{
+      contrastValEl.textContent = parseFloat(contrastEl.value).toFixed(2);
+      applyHistogramOperations();
+      redraw();
+      schedule();
+    });
+  }
+  if (ushiftEl && ushiftValEl) {
+    ushiftValEl.textContent = parseFloat(ushiftEl.value).toFixed(2);
+    ushiftEl.addEventListener('input', ()=>{
+      ushiftValEl.textContent = parseFloat(ushiftEl.value).toFixed(2);
+      applyHistogramOperations();
+      redraw();
+      schedule();
+    });
+  }
+  if (vshiftEl && vshiftValEl) {
+    vshiftValEl.textContent = parseFloat(vshiftEl.value).toFixed(2);
+    vshiftEl.addEventListener('input', ()=>{
+      vshiftValEl.textContent = parseFloat(vshiftEl.value).toFixed(2);
+      applyHistogramOperations();
+      redraw();
+      schedule();
+    });
+  }
+  if (shadowsEl && shadowsValEl) {
+    shadowsValEl.textContent = parseFloat(shadowsEl.value).toFixed(2);
+    shadowsEl.addEventListener('input', ()=>{
+      shadowsValEl.textContent = parseFloat(shadowsEl.value).toFixed(2);
+      applyHistogramOperations();
+      redraw();
+      schedule();
+    });
+  }
+  if (highlightsEl && highlightsValEl) {
+    highlightsValEl.textContent = parseFloat(highlightsEl.value).toFixed(2);
+    highlightsEl.addEventListener('input', ()=>{
+      highlightsValEl.textContent = parseFloat(highlightsEl.value).toFixed(2);
+      applyHistogramOperations();
+      redraw();
+      schedule();
+    });
+  }
+  if (numItersEl && numItersValEl) {
+    numItersValEl.textContent = numItersEl.value;
+    numItersEl.addEventListener('input', ()=>{
+      numItersValEl.textContent = numItersEl.value;
+      schedule();
+    });
+  }
+  if (applyBtnEl) {
+    applyBtnEl.addEventListener('click', ()=>{
+      schedule();
+    });
+  }
+
+  function sourceFromOriginal() {
+    return (originalImageFile instanceof Blob)
+      ? originalImageFile
+      : (originalImageSrc || imgOrigEl.src || null);
+  }
+
+  function sourceFromReference() {
+    // Prefer the currentRefSource (Blob) if set; otherwise fall back to the ref <img> URL
+    return currentRefSource ? currentRefSource : (imgRefEl && imgRefEl.src ? imgRefEl.src : null);
+  }
+
+  function normalizeUrl(url) {
+    // Convert relative URLs to absolute URLs for server requests
+    if (typeof url === 'string' && url.startsWith('/static/')) {
+      return window.location.origin + url;
+    }
+    return url;
+  }
+
+  async function swapOriginalAndReference() {
+    try {
+      // We need *some* reference to swap with
+      const prevRefSrc = sourceFromReference();
+      if (!prevRefSrc) { setStatus('No reference to swap'); return; }
+      setStatus('Swapping…');
+
+      // Snapshot the current original (file or URL)
+      const prevOrigSrc = sourceFromOriginal();
+      if (!prevOrigSrc) { setStatus('No original image loaded'); return; }
+
+      // 1) New REFERENCE := previous ORIGINAL
+      //    This also ensures hist-init will come from this new reference after we set the new original below.
+      refIsSet = true;
+      currentRefSource = prevOrigSrc;     // can be Blob or string
+      await setRefImage(prevOrigSrc);     // updates ref preview and server-side hist (via /hists)
+
+      // 2) New ORIGINAL := previous REFERENCE
+      //    Now load the old reference as the editable base image.
+      if (prevRefSrc instanceof Blob) {
+        await setImageAndComputeHists(prevRefSrc, prevRefSrc);
+
+      } else if (typeof prevRefSrc === 'string' && prevRefSrc) {
+        try {
+          const resp = await fetch(normalizeUrl(prevRefSrc));
+          const blob = await resp.blob();
+          await setImageAndComputeHists(blob, blob);   // now handled as a file
+        } catch (err) {
+          console.error('Failed to fetch URL and convert to Blob', prevRefSrc, err);
+        }
+
+      } else {
+        console.warn('swapOR invalid prevRefSrc', prevRefSrc);
+      }
+      // Optional niceties
+      pushUndoAll();
+      redraw();
+      setStatus('Swapped Original ↔ Reference');
+      
+    } catch (e) {
+      console.error('Swap failed:', e);
+      setStatus('Swap failed');
+    }
+  }
+
+  if (swapEl) swapEl.addEventListener('click', swapOriginalAndReference);
+
+  const chans=[{id:'histR',col:'#ffffff',key:'r'},{id:'histG',col:'#4a90e2',key:'g'},{id:'histB',col:'#e24a4a',key:'b'}];
+
+  let originalImageSrc=null, originalImageFile=null, originalHists=null;
+  let currentFile=null, inFlight=false, currentObjectURL=null;
+  let refObjectURL=null; // NEW: track reference blob URL
+  let refIsSet=false;
+  let srcHists={ r:new Float32Array(128).fill(1), g:new Float32Array(128).fill(1), b:new Float32Array(128).fill(1) };
+  let points={ r:[], g:[], b:[] };
+  let currentRefSource = null;
+  let userTouchedQuality = false;
+  let lastSmoothingValue = 0;
+  let baseHists = { r: new Float32Array(128), g: new Float32Array(128), b: new Float32Array(128) };
+  const undoStacks={ r:[], g:[], b:[] }, redoStacks={ r:[], g:[], b:[] };
+
+  let queued = null; let dragTick = false;
+
+  const clonePts=P=>P.map(p=>({x:p.x,y:p.y}));
+  const setStatus=t=>statusEl.textContent=t;
+  const fitCanvas=c=>{const dpr=Math.max(1,window.devicePixelRatio||1);const w=Math.floor(c.clientWidth*dpr),h=Math.floor(c.clientHeight*dpr); if(c.width!==w||c.height!==h){c.width=w;c.height=h} return {w,h,dpr};};
+  const yMaxOf=P=>P.reduce((m,p)=>p.y>m?p.y:m,1e-6);
+
+  function drawChannel(canvas,key){
+    const {w,h}=fitCanvas(canvas),ctx=canvas.getContext('2d');
+    ctx.clearRect(0,0,w,h); ctx.fillStyle='#101114'; ctx.fillRect(0,0,w,h);
+    ctx.strokeStyle='#2c2f36'; ctx.lineWidth=1; for(let i=0;i<=8;i++){const y=Math.round(i/8*h); ctx.beginPath(); ctx.moveTo(0,y); ctx.lineTo(w,y); ctx.stroke();}
+    const P=points[key]; if(!P.length) return;
+    const yMax=yMaxOf(P); canvas._yMax=yMax; const sx=(w-1)/127, sy=(h*0.90)/(yMax||1e-6);
+    const col=chans.find(c=>c.key===key).col;
+    // Fill under the curve with gradient
+    const gradient=ctx.createLinearGradient(0,0,w,0);
+    if(key==='r'){ // Y' - black to white
+      gradient.addColorStop(0,'rgba(0,0,0,1)');
+      gradient.addColorStop(1,'rgba(255,255,255,1)');
+    }else if(key==='g'){ // Cb - yellow to blue
+      gradient.addColorStop(0,'rgba(255,255,0,1)');
+      gradient.addColorStop(1,'rgba(0,100,255,1)');
+    }else{ // Cr - cyan to red
+      gradient.addColorStop(0,'rgba(0,255,255,1)');
+      gradient.addColorStop(1,'rgba(255,0,0,1)');
+    }
+    ctx.fillStyle=gradient;
+    ctx.beginPath();
+    const firstX=Math.round(P[0].x*sx), firstY=Math.round(h-P[0].y*sy);
+    ctx.moveTo(firstX,firstY);
+    for(let i=1;i<P.length;i++){ const x=Math.round(P[i].x*sx), y=Math.round(h-P[i].y*sy); ctx.lineTo(x,y); }
+    const lastX=Math.round(P[P.length-1].x*sx), lastY=Math.round(h-P[P.length-1].y*sy);
+    ctx.lineTo(lastX,h); ctx.lineTo(firstX,h); ctx.closePath();
+    ctx.fill();
+    // Draw the curve stroke - thick white line drawn ABOVE (bottom edge aligned to data)
+    ctx.strokeStyle='white'; 
+    const lineWidth=8;
+    ctx.lineWidth=lineWidth;
+    ctx.lineJoin='round';
+    ctx.lineCap='round';
+    ctx.beginPath();
+    const offset = lineWidth/2; // offset upward so bottom edge is at the data line
+    for(let i=0;i<P.length;i++){ 
+      const x=Math.round(P[i].x*sx), y=Math.round(h-P[i].y*sy) - offset; 
+      if(i===0) ctx.moveTo(x,y); else ctx.lineTo(x,y); 
+    }
+    ctx.stroke();
+  }
+  function drawColorbar(canvas,key){
+    const {w,h}=fitCanvas(canvas),ctx=canvas.getContext('2d');
+    ctx.clearRect(0,0,w,h);
+    const gradient=ctx.createLinearGradient(0,0,w,0);
+    if(key==='r'){ // Y' - black to white
+      gradient.addColorStop(0,'rgba(0,0,0,1)');
+      gradient.addColorStop(1,'rgba(255,255,255,1)');
+    }else if(key==='g'){ // Cb - yellow to blue
+      gradient.addColorStop(0,'rgba(255,255,0,1)');
+      gradient.addColorStop(1,'rgba(0,100,255,1)');
+    }else{ // Cr - cyan to red
+      gradient.addColorStop(0,'rgba(0,255,255,1)');
+      gradient.addColorStop(1,'rgba(255,0,0,1)');
+    }
+    ctx.fillStyle=gradient;
+    ctx.fillRect(0,0,w,h);
+  }
+  function redraw(){ 
+    for(const c of chans) {
+      drawChannel(document.getElementById(c.id),c.key);
+      const colorbarId = 'colorbar' + (c.key === 'r' ? 'R' : c.key === 'g' ? 'G' : 'B');
+      drawColorbar(document.getElementById(colorbarId),c.key);
+    }
+  }
+
+  function buildPointsFromHist(H,N){ const P=[], step=127/(N-1); for(let i=0;i<N;i++){ const x=i*step, y=sampleHist(H,x); P.push({x, y:Math.max(0,y)});} return P; }
+  function sampleHist(H,x){ const i0=Math.max(0,Math.min(127,Math.floor(x))), i1=Math.min(127,i0+1), t=x-i0; return H[i0]*(1-t)+H[i1]*t; }
+  function samplePolyline(P,x){
+    if(!P.length) return 0; if(x<=P[0].x) return P[0].y; const n=P.length; if(x>=P[n-1].x) return P[n-1].y;
+    let lo=0,hi=n-1; while(hi-lo>1){ const mid=(lo+hi)>>1; if(P[mid].x<=x) lo=mid; else hi=mid; }
+    const t=(x-P[lo].x)/Math.max(1e-9,(P[hi].x-P[lo].x)); return P[lo].y*(1-t)+P[hi].y*t;
+  }
+  function pointsToHist(P){ const H=new Float32Array(128); for(let i=0;i<128;i++) H[i]=Math.max(0,samplePolyline(P,i)); return H; }
+
+  function smoothstep(a, b, x) {
+    const t = Math.min(1, Math.max(0, (x - a) / Math.max(1e-12, b - a)));
+    return t * t * (3 - 2 * t);
+  }
+
+  function applyToneCurve(bins, gamma_s, gamma_h) {
+    const N = 128;
+    const t_s = 0.40, t_h = 0.60, b = 0.10;
+
+    // Precompute forward LUT T(x) at bin centers
+    const T = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      const x = i / (N - 1);
+      const ws = 1 - smoothstep(t_s, t_s + b, x);
+      const wh = smoothstep(t_h - b, t_h, x);
+
+      // region curves
+      let Ts = x;
+      if (x <= t_s + b) {
+        const xn = (x <= 1e-8) ? 0 : Math.min(1, x / t_s);
+        Ts = t_s * Math.pow(xn, gamma_s);
+      }
+      let Th = x;
+      if (x >= t_h - b) {
+        const xn = Math.min(1, (1 - x) / (1 - t_h));
+        Th = 1 - (1 - t_h) * Math.pow(xn, gamma_h);
+      }
+
+      T[i] = x + ws * (Ts - x) + wh * (Th - x);
+    }
+
+    // Enforce strict monotonicity (tiny epsilon bumps if needed)
+    for (let i = 1; i < N; i++) {
+      if (T[i] <= T[i-1]) T[i] = Math.min(1, T[i-1] + 1e-6);
+    }
+
+    // Build inverse LUT via monotone search
+    const invT = new Float32Array(N);
+    let j = 0;
+    for (let i = 0; i < N; i++) {
+      const y = i / (N - 1);
+      while (j+1 < N && T[j+1] < y) j++;
+      if (j+1 >= N) { invT[i] = 1; continue; }
+      const t = (y - T[j]) / Math.max(1e-12, (T[j+1] - T[j]));
+      invT[i] = (j + t) / (N - 1); // x_in in [0,1]
+    }
+
+    // Resample bins with inverse mapping (like your exposure remap)
+    const out = new Float32Array(N);
+    for (let i = 0; i < N; i++) {
+      const xin = invT[i] * (N - 1);
+      const x0 = Math.floor(xin);
+      const x1 = Math.min(N - 1, x0 + 1);
+      const t = xin - x0;
+      out[i] = bins[x0] * (1 - t) + bins[x1] * t;
+    }
+    return out;
+  }
+
+  function applyShift(bins, shiftFactor) {
+    const N = bins.length;
+    const out = new Float32Array(N);
+
+    // shiftFactor in [-1, 1]
+    // -1 => collapse to first bin
+    // +1 => collapse to last bin
+    const shiftBins = shiftFactor * (N - 1);
+
+    for (let i = 0; i < N; i++) {
+      const newPos = i + shiftBins;
+
+      if (newPos <= 0) {
+        out[0] += bins[i]; // everything before first bin collapses into bin 0
+      } else if (newPos >= N - 1) {
+        out[N - 1] += bins[i]; // everything beyond last bin collapses into last bin
+      } else {
+        const x0 = Math.floor(newPos);
+        const x1 = x0 + 1;
+        const t = newPos - x0;
+
+        // Linear interpolation / splatting
+        out[x0] += bins[i] * (1 - t);
+        out[x1] += bins[i] * t;
+      }
+    }
+
+    return out;
+  }
+
+
+
+  function updateBaseBuffer() {
+    // Initialize base buffer from source histograms (not from current points)
+    // This ensures baseHists contains only user modifications, not slider effects
+    for (const channel of ['r', 'g', 'b']) {
+      baseHists[channel] = new Float32Array(srcHists[channel]);
+    }
+    applyHistogramOperations();
+  }
+
+  function applyHistogramOperations() {
+    const smoothingFactor = parseFloat(smoothingEl.value);
+    const exposureFactor = parseFloat(exposureEl.value);
+    const contrastFactor = parseFloat(contrastEl.value);
+    const ushiftFactor = parseFloat(ushiftEl.value);
+    const vshiftFactor = parseFloat(vshiftEl.value);
+    const S = parseFloat(shadowsEl?.value ?? "0");      // [-100,100]
+    const H = parseFloat(highlightsEl?.value ?? "0");   // [-100,100]
+    const k = Math.log(2) / 100;
+    const gamma_s = Math.exp(-k * S);
+    const gamma_h = Math.exp(+k * H);
+    
+    // Apply both operations to each channel from base buffer
+    for (const channel of ['r', 'g', 'b']) {
+      let processed = new Float32Array(baseHists[channel]);
+      
+      // Step 1: Apply exposure adjustment if needed
+      if ((exposureFactor !== 1.0) && (channel === 'r')) {
+        const adjusted = new Float32Array(128);
+        
+        // First pass: distribute values normally
+        for (let i = 0; i < 128; i++) {
+          const sourceX = i / exposureFactor;
+          
+          if (sourceX >= 128) {
+            adjusted[i] = 0;
+          } else if (sourceX < 0) {
+            adjusted[i] = 0;
+          } else {
+            const x0 = Math.floor(sourceX);
+            const x1 = Math.min(127, x0 + 1);
+            const t = sourceX - x0;
+            
+            // Interpolate between bins
+            adjusted[i] = processed[x0] * (1 - t) + processed[x1] * t;
+          }
+        }
+        
+        // Second pass: accumulate overflow into the last bin (saturation)
+        if (exposureFactor > 1.0) {
+          let overflowSum = 0;
+          // Check which input bins would map beyond our output range
+          for (let inputBin = 0; inputBin < 128; inputBin++) {
+            const outputBin = inputBin * exposureFactor;
+            if (outputBin >= 128) {
+              // This input bin would map beyond our range, accumulate it
+              overflowSum += processed[inputBin];
+            }
+          }
+          adjusted[127] += overflowSum;
+        }
+        
+        processed = adjusted;
+      }
+      
+      // Step 2: Apply tone curve (shadows/highlights) if needed
+      if ((S !== 0 || H !== 0) && (channel === 'r')) {
+        processed = applyToneCurve(processed, gamma_s, gamma_h);
+      }
+      
+      // Step 3: Apply smoothing if needed
+      if (smoothingFactor > 0) {
+        const smoothed = new Float32Array(128);
+        const radius_factor = 1000;
+        const radius = Math.floor(smoothingFactor * radius_factor);
+        
+        for (let i = 0; i < 128; i++) {
+          let sum = 0;
+          let weight = 0;
+          
+          for (let j = Math.max(0, i - radius); j <= Math.min(127, i + radius); j++) {
+            const dist = Math.abs(i - j);
+            const w = Math.exp(-(dist * dist) / (2 * smoothingFactor * smoothingFactor * radius_factor));
+            sum += processed[j] * w;
+            weight += w;
+          }
+          
+          smoothed[i] = weight > 0 ? sum / weight : processed[i];
+        }
+        processed = smoothed;
+      }
+      
+      // Step 4: Apply contrast adjustment if needed
+      if (channel === 'r' && contrastFactor !== 1.0) {
+        const N = 128;
+
+        function normalizeHist(hist) {
+          const sum = hist.reduce((a, b) => a + b, 0);
+          return hist.map(v => (sum > 0 ? v / sum : 0));
+        }
+
+        function cdfFromHist(pdf) {
+          const cdf = new Float32Array(pdf.length);
+          pdf.reduce((acc, v, i) => (cdf[i] = acc + v, acc + v), 0);
+          return cdf;
+        }
+
+        function invCDF(cdf, numSamples = 4096) {
+          const quantiles = new Float32Array(numSamples);
+          let j = 0;
+          for (let i = 0; i < numSamples; i++) {
+            const p = i / (numSamples - 1);
+            while (j < cdf.length - 1 && cdf[j] < p) j++;
+            quantiles[i] = j;
+          }
+          return quantiles;
+        }
+
+        function cdfInterpolate(histA, histB, alpha) {
+          const factor = 10; // oversampling factor
+          const fineBins = histA.length * factor;
+
+          const pdfA = normalizeHist(histA);
+          const pdfB = normalizeHist(histB);
+
+          const cdfA = cdfFromHist(pdfA);
+          const cdfB = cdfFromHist(pdfB);
+
+          const qA = invCDF(cdfA, fineBins);
+          const qB = invCDF(cdfB, fineBins);
+
+          const qInterp = new Float32Array(fineBins);
+          for (let i = 0; i < fineBins; i++) {
+            qInterp[i] = Math.min(
+              histA.length - 1,
+              Math.max(0, (1 - alpha) * qA[i] + alpha * qB[i])
+            );
+          }
+          
+          const histFine = new Float32Array(fineBins);
+          for (let i = 0; i < fineBins; i++) {
+            const q = qInterp[i] * factor;  // quantile scaled to fine grid
+            const bin = Math.floor(q);
+            const t = q - bin;
+            if (bin >= 0 && bin < histFine.length) histFine[bin] += (1 - t);
+            if (bin + 1 < histFine.length) histFine[bin + 1] += t;
+          }
+
+          function gaussianFilter(signal, sigma) {
+            const radius = Math.ceil(3 * sigma); // 3σ rule
+            const kernelSize = 2 * radius + 1;
+            const kernel = new Float32Array(kernelSize);
+
+            // build kernel
+            let sum = 0;
+            for (let i = -radius; i <= radius; i++) {
+              const w = Math.exp(-(i * i) / (2 * sigma * sigma));
+              kernel[i + radius] = w;
+              sum += w;
+            }
+            // normalize
+            for (let i = 0; i < kernelSize; i++) {
+              kernel[i] /= sum;
+            }
+
+            // convolve
+            const out = new Float32Array(signal.length);
+            for (let i = 0; i < signal.length; i++) {
+              let acc = 0;
+              for (let k = -radius; k <= radius; k++) {
+                const j = i + k;
+                if (j >= 0 && j < signal.length) {
+                  acc += signal[j] * kernel[k + radius];
+                }
+              }
+              out[i] = acc;
+            }
+            return out;
+          }
+
+          //antialiased downsampling to target bins
+          //first low pass filter
+          const histFineSmoothed = gaussianFilter(histFine, Math.floor(factor/2));
+          const antialiasedHist = new Float32Array(histA.length);
+          for (let i = 0; i < histA.length; i++) {
+            let sum = 0;
+            for (let k = 0; k < factor; k++) {
+              sum += histFineSmoothed[i * factor + k];
+            }
+            antialiasedHist[i] = sum / factor;
+          }
+
+          // Normalize mass
+          const targetMass = histA.reduce((a, b) => a + b, 0);
+          const interpMass = antialiasedHist.reduce((a, b) => a + b, 0);
+          if (interpMass > 0) {
+            for (let i = 0; i < antialiasedHist.length; i++) {
+              antialiasedHist[i] *= targetMass / interpMass;
+            }
+          }
+
+          return antialiasedHist;
+        }
+
+        // Build anchors
+        const totalMass = processed.reduce((a, b) => a + b, 0);
+        const minContrastHist = new Float32Array(N);
+        minContrastHist[processed.indexOf(Math.max(...processed))] = totalMass;
+        let contrasted = cdfInterpolate(minContrastHist, processed, contrastFactor);
+        processed = contrasted;
+      }
+
+      if ((ushiftFactor !== 0.0) && (channel === 'g')) {
+        processed = applyShift(processed, ushiftFactor);
+      }
+      if ((vshiftFactor !== 0.0) && (channel === 'b')) {
+        processed = applyShift(processed, vshiftFactor);
+      }
+
+
+
+      // Convert final processed histogram to points
+      points[channel] = buildPointsFromHist(processed, points[channel].length);
+    }
+
+  }
+
+
+
+  function enforceMonotoneBounded(out, dx_bins) {
+    const N = out.length;
+    if (N < 2) return;
+
+    const baseStep = 127 / Math.max(1, N - 1);
+    const Δ = 0.75 * baseStep; // allow some compression; tune 0.6–0.9
+
+    // Per-index feasible box that enforces both spacing + bounds
+    const lo = new Array(N);
+    const hi = new Array(N);
+    for (let i = 0; i < N; i++) {
+      lo[i] = i * Δ;
+      hi[i] = 127 - (N - 1 - i) * Δ;
+      if (hi[i] < lo[i]) {
+        // if Δ is too large for N, fall back to exact step
+        const step = 127 / Math.max(1, N - 1);
+        lo[i] = i * step;
+        hi[i] = i * step;
+      }
+    }
+
+    // Start by clamping to [0,127]
+    for (let i = 0; i < N; i++) {
+      out[i].x = Math.min(127, Math.max(0, out[i].x));
+    }
+
+    // Directional pass first (lets the block slide in drag direction)
+    if (dx_bins < 0) {
+      // LEFT drag: first ensure from right to left
+      for (let i = N - 2; i >= 0; i--) {
+        if (out[i].x > out[i + 1].x - Δ) out[i].x = out[i + 1].x - Δ;
+        if (out[i].x < lo[i]) out[i].x = lo[i];
+      }
+      // Then left->right to fix residuals
+      for (let i = 1; i < N; i++) {
+        if (out[i].x < out[i - 1].x + Δ) out[i].x = out[i - 1].x + Δ;
+        if (out[i].x > hi[i]) out[i].x = hi[i];
+      }
+    } else {
+      // RIGHT drag: first ensure from left to right
+      for (let i = 1; i < N; i++) {
+        if (out[i].x < out[i - 1].x + Δ) out[i].x = out[i - 1].x + Δ;
+        if (out[i].x > hi[i]) out[i].x = hi[i];
+      }
+      // Then right->left to fix residuals
+      for (let i = N - 2; i >= 0; i--) {
+        if (out[i].x > out[i + 1].x - Δ) out[i].x = out[i + 1].x - Δ;
+        if (out[i].x < lo[i]) out[i].x = lo[i];
+      }
+    }
+
+    // Final clamp (numerical safety)
+    for (let i = 0; i < N; i++) {
+      if (out[i].x < lo[i]) out[i].x = lo[i];
+      if (out[i].x > hi[i]) out[i].x = hi[i];
+    }
+
+    // Optional tiny smoothing that keeps feasibility
+    for (let i = 1; i < N - 1; i++) {
+      const xm = 0.5 * (out[i - 1].x + out[i + 1].x);
+      out[i].x = 0.85 * out[i].x + 0.15 * xm;
+      // Re-clamp to interval after smoothing
+      if (out[i].x < lo[i]) out[i].x = lo[i];
+      if (out[i].x > hi[i]) out[i].x = hi[i];
+    }
+  }
+  
+  function applyPointBrush(P,canvas,mouseDown,current){
+    const {width:w,height:h}=canvas, sigmaPx=parseFloat(sigmaPxEl.value);
+    const dx_px=current.x-mouseDown.x, dy_px=current.y-mouseDown.y;
+    const sx=127/(w-1); const yMax=canvas._dragYMax||yMaxOf(P)||1; const sy=yMax/h;
+    let dx_bins=dx_px*sx, dy_val=-dy_px*sy;
+    const out=clonePts(P), wgts=new Array(out.length); let closestIdx=0,closestDist=1e9;
+
+    for(let i=0;i<out.length;i++){
+      const px=(P[i].x/127)*(w-1), py=h-(P[i].y/(yMax||1e-6))*h;
+      const ddx=px-mouseDown.x, ddy=py-mouseDown.y, d2=ddx*ddx+ddy*ddy;
+      const wgt=Math.exp(-d2/(sigmaPx*sigmaPx)); wgts[i]=wgt;
+      if(d2<closestDist){ closestIdx=i; closestDist=d2; }
+    }
+    for(let i=closestIdx;i<out.length-1;i++) if(wgts[i]<wgts[i+1]) wgts[i+1]=wgts[i];
+    for(let i=closestIdx;i>0;i--) if(wgts[i]<wgts[i-1]) wgts[i-1]=wgts[i];
+
+    for(let i=0;i<out.length;i++){
+      out[i].x=Math.max(0,Math.min(127,out[i].x+wgts[i]*dx_bins));
+      out[i].y=Math.max(0,out[i].y+wgts[i]*dy_val);
+    }
+    // after you compute wgts and set tentative out[i].x / out[i].y ...
+    dx_bins = ((current.x - mouseDown.x) * 127) / Math.max(1, (canvas.width - 1));
+    enforceMonotoneBounded(out, dx_bins);
+
+    // Keep endpoints inside domain if you pin them
+    out[0].x = Math.max(0, Math.min(127, out[0].x));
+    out[out.length - 1].x = Math.max(0, Math.min(127, out[out.length - 1].x));
+
+    // Also clamp Y to >=0 so hist can't "vanish" from negatives
+    for (let i = 0; i < out.length; i++) {
+      if (!Number.isFinite(out[i].y)) out[i].y = 0;
+      if (out[i].y < 0) out[i].y = 0;
+    }
+    
+
+
+
+    if(preserveMassEl.checked){
+      const mass=H=>{let s=0;for(let i=0;i<128;i++) s+=H[i];return s;};
+      const k=(m=>m[0]>1e-12&&m[1]>1e-12?m[0]/m[1]:1)([(mass(pointsToHist(P))), (mass(pointsToHist(out)))]);
+      if(k!==1) for(const p of out) p.y*=k;
+    }
+    if(clamp0El.checked) for(const p of out) if(p.y<0) p.y=0;
+    return out;
+  }
+
+  function normalizeForSend(H){ let sum=0; for(let i=0;i<128;i++) sum+=H[i]; const a=new Array(128); if(sum<=1e-12){ for(let i=0;i<128;i++) a[i]=0; return a; } for(let i=0;i<128;i++) a[i]=H[i]/sum; return a; }
+
+  // --- queue plumbing ---
+  function buildPayload(){
+    const form = new FormData();
+    if (currentFile) form.append('file', currentFile);
+    const Hr = pointsToHist(points.r), Hg = pointsToHist(points.g), Hb = pointsToHist(points.b);
+    form.append('hist_r', JSON.stringify(normalizeForSend(Hr)));
+    form.append('hist_g', JSON.stringify(normalizeForSend(Hg)));
+    form.append('hist_b', JSON.stringify(normalizeForSend(Hb)));
+    if (maxPixelsEl) form.append('max_pixels', maxPixelsEl.value);
+    if (qualityEl) form.append('quality', qualityEl.value);
+    if (creativeEl) form.append('creative', creativeEl.value);
+    if (amountEl) form.append('amount', amountEl.value);
+    if (numItersEl) form.append('num_iters', numItersEl.value);
+    return form;
+  }
+
+  function schedule(){
+    queued = buildPayload();
+    if (!inFlight) { const next = queued; queued = null; send(next); }
+    else setStatus('Queued change');
+  }
+
+  function scheduleDuringDrag(){
+    if (dragTick) return;
+    dragTick = true;
+    requestAnimationFrame(()=>{ dragTick = false; schedule(); });
+  }
+
+  async function send(form){
+    inFlight = true;
+    setStatus('Applying...');
+    try {
+      const res = await fetch('/apply', { method: 'POST', body: form });
+      const data = await res.json();
+      if (data.imageBase64) {
+        imgEditEl.src = data.imageBase64;
+        imgEditEl.style.opacity = '1'; // Show edited image after server processes it
+        updateEditedSdrMirror(imgEditEl.src);
+      }
+      redraw();                                                // keep user histogram
+    } catch (e) {
+      console.error(e);
+    } finally {
+      inFlight = false;
+      if (queued) { const next = queued; queued = null; send(next); }
+      else setStatus('Idle');
+    }
+  }
+
+
+
+
+
+
+
+
+  function isAvifSrc(src) {
+    if (!src) return false;
+    if (typeof src !== 'string') return false;
+    if (src.startsWith('data:')) return /^data:image\/avif/i.test(src);
+    try {
+      const u = new URL(src, location.href);
+      return /\.avif($|\?)/i.test(u.pathname);
+    } catch {
+      return /\.avif($|\?)/i.test(src);
+    }
+  }
+
+  // Render an SDR preview by rasterizing into a canvas and encoding as JPEG/PNG.
+  // (Browsers rasterize to SDR canvas; this is a pragmatic tone-map.)
+  async function buildSdrPreview(src) {
+    return new Promise((resolve, reject) => {
+      const im = new Image();
+      im.crossOrigin = 'anonymous';          // safe for same-origin; ignored for data: URLs
+      im.onload = () => {
+        try {
+          const w = Math.max(1, im.naturalWidth || im.width);
+          const h = Math.max(1, im.naturalHeight || im.height);
+          // Prefer OffscreenCanvas if available
+          let canvas, ctx;
+          if ('OffscreenCanvas' in window) {
+            canvas = new OffscreenCanvas(w, h);
+            ctx = canvas.getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(im, 0, 0, w, h);
+            canvas.convertToBlob({ type: 'image/jpeg', quality: 0.92 })
+              .then(blob => resolve(URL.createObjectURL(blob)))
+              .catch(() => canvas.convertToBlob({ type: 'image/png' }).then(blob => resolve(URL.createObjectURL(blob))));
+          } else {
+            canvas = document.createElement('canvas');
+            canvas.width = w; canvas.height = h;
+            ctx = canvas.getContext('2d', { willReadFrequently: true });
+            ctx.drawImage(im, 0, 0, w, h);
+            // Try JPEG first, fallback to PNG
+            const tryUrl = canvas.toDataURL('image/jpeg', 0.92);
+            resolve(tryUrl && tryUrl.startsWith('data:') ? tryUrl : canvas.toDataURL('image/png'));
+          }
+        } catch (e) { reject(e); }
+      };
+      im.onerror = () => reject(new Error('Failed to load Edited for SDR conversion'));
+      im.src = src;
+    });
+  }
+
+  async function updateEditedSdrMirror(editedSrc) {
+    // Show SDR only when Edited looks like AVIF
+    if (!isAvifSrc(editedSrc)) {
+      editedSdrBlockEl.style.display = 'none';
+      imgEditSdrEl.removeAttribute('src');
+      //make quality default to 92 if its 60
+      if (!userTouchedQuality) {
+        qualityEl.value = 92;
+        qualityValEl.textContent = qualityEl.value;
+      }
+      return;
+    } else {
+      // if quality above 60, set it to 60
+      if (!userTouchedQuality) {
+        qualityEl.value = 60;
+        qualityValEl.textContent = qualityEl.value;
+      }
+    }
+    try {
+      editedSdrBlockEl.style.display = 'block';
+      // Optional: quick placeholder while we rasterize
+      imgEditSdrEl.src = '';
+      const sdrUrl = await buildSdrPreview(editedSrc);
+      imgEditSdrEl.src = sdrUrl;
+    } catch (e) {
+      console.error('SDR preview build failed:', e);
+      editedSdrBlockEl.style.display = 'none';
+      imgEditSdrEl.removeAttribute('src');
+    }
+  }
+
+
+
+  function rebuildPoints(){ const N=parseInt(numPtsEl.value,10); points.r=buildPointsFromHist(srcHists.r,N); points.g=buildPointsFromHist(srcHists.g,N); points.b=buildPointsFromHist(srcHists.b,N); }
+
+
+  function to128Triple({ hist_r, hist_g, hist_b }) {
+    return {
+      r: hist_r || [],
+      g: hist_g || [],
+      b: hist_b || [],
+    };
+  }
+  async function fetchServerHists(src) {
+    // 1) Blob -> multipart
+    if (src instanceof Blob) {
+      const form = new FormData();
+      form.append('file', src);
+      const res = await fetch('/hists', { method: 'POST', body: form });
+      if (!res.ok) throw new Error(`server /hists failed: ${res.status}`);
+      const data = await res.json();
+      return to128Triple(data);
+    }
+
+    // 2) string URL -> JSON
+    if (typeof src === 'string') {
+      // If it's a blob: URL, the server can't fetch it; resolve to a real Blob locally.
+      if (src.startsWith('blob:')) {
+        const r = await fetch(src);
+        const blob = await r.blob();
+        return fetchServerHists(blob); // recurse into Blob path
+      }
+      const res = await fetch('/hists', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: src })
+      });
+      if (!res.ok) throw new Error(`server /hists failed: ${res.status}`);
+      const data = await res.json();
+      return to128Triple(data);
+    }
+
+    throw new Error('Invalid source');
+  }
+
+
+  async function setImageAndComputeHists(src,file=null){
+    setStatus('Loading image…');
+    
+    // Clear reference when loading a new original image
+    if (refObjectURL) { URL.revokeObjectURL(refObjectURL); refObjectURL = null; }
+    refIsSet = false;
+    currentRefSource = null;
+    imgRefEl.src = '';
+    if (referenceBlockEl) referenceBlockEl.style.display = 'none';
+    
+    imgOrigEl.onload=async ()=>{
+      try{
+        //Always compute histogram from the original image being loaded
+        const H = (file instanceof Blob)
+                ? await fetchServerHists(file)
+                : await fetchServerHists(normalizeUrl(src || '/static/yellowFlower.jpg'));
+        srcHists=H; rebuildPoints();
+        //check if previous image was avif
+        const isOrigAvif = isAvifSrc(originalImageSrc);
+        originalImageFile= file;
+        // Update originalImageSrc to match the newly loaded image
+        originalImageSrc = imgOrigEl.src;
+        // Always update originalHists when loading a new image
+        originalHists={ r:new Float32Array(H.r), g:new Float32Array(H.g), b:new Float32Array(H.b) };
+        imgEditEl.style.opacity = '0'; // Hide until server processes
+        editedSdrBlockEl.style.display = 'none'; // Hide SDR preview too
+        imgEditEl.src = imgOrigEl.src;
+        //check if new image is avif
+        const isNewAvif = isAvifSrc(originalImageSrc);
+        //if isNewAvif is different from isOrigAvif, set userTouchedQuality to false
+        if (isNewAvif !== isOrigAvif) {
+          console.log("userTouchedQuality set to false");
+          userTouchedQuality = false;
+        } else {
+          console.log("userTouchedQuality is not changed");
+        }
+        updateEditedSdrMirror(imgEditEl.src);
+
+
+        for(const c of ['r','g','b']){ undoStacks[c].length=0; redoStacks[c].length=0; }
+        updateBaseBuffer(); // Initialize base buffer and apply smoothing
+        pushUndoAll(); redraw(); 
+        // Show histograms after smoothing is applied to prevent flash
+        for(const c of chans) document.getElementById(c.id).style.opacity='1';
+        setStatus('Ready');
+        schedule(); //apply current histogram to server (optional but useful)
+      }catch(err){ console.error(err); setStatus('Error computing histogram'); }
+    };
+    imgOrigEl.onerror=()=>setStatus('Error loading image');
+    if (currentObjectURL) { URL.revokeObjectURL(currentObjectURL); currentObjectURL = null; }
+
+    if (file instanceof Blob) {
+      currentObjectURL = URL.createObjectURL(file);
+      imgOrigEl.src = currentObjectURL;
+      currentFile = file;
+    } else if (typeof src === 'string' && src) {
+      imgOrigEl.src = src;
+      currentFile = null;
+    } else {
+      imgOrigEl.src = '/static/yellowFlower.jpg';
+      currentFile = null;
+    }
+  }
+
+  function attachEditor(canvas,key){
+    let dragging=false, mouseDown=null, basePts=null;
+    canvas.addEventListener('pointerdown',e=>{
+      dragging=true; canvas.setPointerCapture?.(e.pointerId);
+      // Start from the base histogram (without slider effects) for dragging
+      basePts=buildPointsFromHist(baseHists[key], points[key].length);
+      canvas._dragYMax=yMaxOf(basePts);
+      const rect=canvas.getBoundingClientRect();
+      mouseDown={ x:(e.clientX-rect.left)*(canvas.width/rect.width), y:(e.clientY-rect.top)*(canvas.height/rect.height) };
+      paint(e);
+    });
+    canvas.addEventListener('pointermove',e=>{ if(dragging) paint(e); });
+    function paint(e){
+      const rect=canvas.getBoundingClientRect();
+      const cur={ x:(e.clientX-rect.left)*(canvas.width/rect.width), y:(e.clientY-rect.top)*(canvas.height/rect.height) };
+      const modifiedPts = applyPointBrush(basePts,canvas,mouseDown,cur);
+      // Store the modified base histogram (without slider effects)
+      baseHists[key] = pointsToHist(modifiedPts);
+      // Apply slider operations to get the displayed points
+      applyHistogramOperations();
+      redraw();
+      scheduleDuringDrag();
+    }
+    function end(e){
+      if(!dragging) return; dragging=false; canvas.releasePointerCapture?.(e.pointerId); canvas._dragYMax=null;
+      // baseHists already updated during paint, just finalize
+      pushUndoAll(); schedule();
+    }
+    canvas.addEventListener('pointerup',end);
+    canvas.addEventListener('pointercancel',end);
+    canvas.addEventListener('mouseleave',e=>{ if(dragging) end(e); });
+    canvas.addEventListener('dblclick',()=>{ 
+      baseHists[key] = new Float32Array(srcHists[key]);
+      applyHistogramOperations();
+      redraw(); 
+      schedule(); 
+    });
+  }
+
+  function pushUndoAll(){ 
+    for(const c of ['r','g','b']){ 
+      // Store baseHists instead of points, since points are derived
+      undoStacks[c].push(new Float32Array(baseHists[c])); 
+      redoStacks[c].length=0; 
+    } 
+    updateUndoRedo(); 
+  }
+  function undo(){ 
+    for(const c of ['r','g','b']) {
+      if(undoStacks[c].length){ 
+        const prev=undoStacks[c].pop(); 
+        redoStacks[c].push(new Float32Array(baseHists[c])); 
+        baseHists[c]=prev; 
+      }
+    } 
+    applyHistogramOperations();
+    updateUndoRedo(); 
+    redraw(); 
+    schedule(); 
+  }
+  function redo(){ 
+    for(const c of ['r','g','b']) {
+      if(redoStacks[c].length){ 
+        const nxt=redoStacks[c].pop(); 
+        undoStacks[c].push(new Float32Array(baseHists[c])); 
+        baseHists[c]=nxt; 
+      }
+    } 
+    applyHistogramOperations();
+    updateUndoRedo(); 
+    redraw(); 
+    schedule(); 
+  }
+  function updateUndoRedo(){ undoEl.disabled=!['r','g','b'].some(c=>undoStacks[c].length); redoEl.disabled=!['r','g','b'].some(c=>redoStacks[c].length); }
+
+  for(const c of chans) attachEditor(document.getElementById(c.id),c.key);
+
+  fileEl.addEventListener('change',()=>{
+    const f=fileEl.files&&fileEl.files[0]?fileEl.files[0]:null;
+    setImageAndComputeHists(f?URL.createObjectURL(f):'/static/yellowFlower.jpg',f);
+  });
+
+  async function setRefImage(f){
+    if (refObjectURL) { URL.revokeObjectURL(refObjectURL); refObjectURL = null; }
+
+    if (!f) {
+      imgRefEl.src = '';
+      refIsSet = false;
+      currentRefSource = null;
+      if (referenceBlockEl) referenceBlockEl.style.display = 'none';
+      setStatus('Reference cleared');
+      return;
+    }
+
+    // Normalize and display
+    if (typeof f === 'string') {
+      imgRefEl.src = f;
+      currentRefSource = f;            // ← set for strings too
+      refIsSet = true;
+    } else if (f instanceof Blob) {
+      try {
+        refObjectURL = URL.createObjectURL(f);
+        imgRefEl.src = refObjectURL;
+        currentRefSource = f;          // ← keep the Blob
+        refIsSet = true;
+      } catch (err) {
+        console.error('createObjectURL failed for reference', err);
+        imgRefEl.src = ''; refIsSet = false; currentRefSource = null;
+        setStatus('Error loading reference'); return;
+      }
+    } else {
+      imgRefEl.src = ''; refIsSet = false; currentRefSource = null;
+      setStatus('Invalid reference'); return;
+    }
+
+    // Compute hists from the exact thing we just set
+    imgRefEl.onload = async () => {
+      try {
+        // Show the reference block now that we have a reference
+        if (referenceBlockEl) referenceBlockEl.style.display = 'block';
+        
+        const H = await fetchServerHists(normalizeUrl(currentRefSource || imgRefEl.src));
+        srcHists = H; rebuildPoints();
+        updateBaseBuffer();
+
+        for (const c of ['r','g','b']) { undoStacks[c].length = 0; redoStacks[c].length = 0; }
+        pushUndoAll();
+        redraw();
+        // Show histograms after smoothing is applied
+        for(const c of chans) document.getElementById(c.id).style.opacity='1';
+
+        // (Optional) keep originalHists representing the "reset-to" target when a reference is active:
+        originalHists = { r:new Float32Array(H.r), g:new Float32Array(H.g), b:new Float32Array(H.b) };
+
+        setStatus('Histogram initialized from reference (server)');
+        schedule();
+      } catch (e) {
+        console.error(e);
+        setStatus('Error fetching reference histogram');
+      }
+    };
+    imgRefEl.onerror = () => {
+      if (referenceBlockEl) referenceBlockEl.style.display = 'none';
+      setStatus('Error loading reference');
+    };
+  }
+
+  refFileEl.addEventListener('change',()=>{
+    const f = refFileEl.files && refFileEl.files[0] ? refFileEl.files[0] : null;
+    currentRefSource = f;
+    setRefImage(f);
+  });
+
+  resetAllEl.addEventListener('click',()=>{
+    //make quality default to 92 if not avif else 60
+    if (isAvifSrc(imgEditEl.src)) {
+      qualityEl.value = 60;
+      qualityValEl.textContent = qualityEl.value;
+    } else {
+      qualityEl.value = 92;
+      qualityValEl.textContent = qualityEl.value;
+    }
+    //set max pixels to 1000000
+    maxPixelsEl.value = 1000000;
+    maxPixelsValEl.textContent = fmtMP(parseInt(maxPixelsEl.value,10));
+    //set brush sigma to 60
+    sigmaPxEl.value = 60;
+    sigmaPxValEl.textContent = sigmaPxEl.value;
+    amountEl.value = 1.0;
+    amountValEl.textContent = parseFloat(amountEl.value).toFixed(2);
+    numItersEl.value = 1;
+    numItersValEl.textContent = numItersEl.value;
+
+    // Reset histogram sliders
+    smoothingEl.value = 0.05;
+    smoothingValEl.textContent = parseFloat(smoothingEl.value).toFixed(2);
+    exposureEl.value = 1.0;
+    exposureValEl.textContent = parseFloat(exposureEl.value).toFixed(2);
+    ushiftEl.value = 0.0;
+    ushiftValEl.textContent = parseFloat(ushiftEl.value).toFixed(2);
+    vshiftEl.value = 0.0;
+    vshiftValEl.textContent = parseFloat(vshiftEl.value).toFixed(2);
+    contrastEl.value = 1.0;
+    contrastValEl.textContent = parseFloat(contrastEl.value).toFixed(2);
+    shadowsEl.value = 0;
+    shadowsValEl.textContent = parseFloat(shadowsEl.value).toFixed(2);
+    highlightsEl.value = 0;
+    highlightsValEl.textContent = parseFloat(highlightsEl.value).toFixed(2);
+    //set brush sigma value to 60
+    if(!originalImageSrc||!originalHists) return;
+    // If a reference is set, reset to the reference histogram and image; otherwise reset to the original
+    if (refIsSet) {
+              srcHists={ r:new Float32Array(originalHists.r), g:new Float32Array(originalHists.g), b:new Float32Array(originalHists.b) };
+        rebuildPoints();
+        updateBaseBuffer(); // Update base buffer after reset
+        applyHistogramOperations(); // Apply reset slider values
+        redraw();
+        // keep current original image as-is; edited will be re-applied from histogram
+        imgEditEl.style.opacity = '0'; // Hide until server processes
+        editedSdrBlockEl.style.display = 'none'; // Hide SDR preview too
+        imgEditEl.src=imgOrigEl.src;
+        for(const c of ['r','g','b']){ undoStacks[c]=[]; redoStacks[c]=[]; }
+        pushUndoAll(); setStatus('Reset to reference');
+        schedule();
+        return;
+    }
+    // No reference; reset to original
+    srcHists={ r:new Float32Array(originalHists.r), g:new Float32Array(originalHists.g), b:new Float32Array(originalHists.b) };
+    rebuildPoints();
+    updateBaseBuffer(); // Update base buffer after reset
+    applyHistogramOperations(); // Apply reset slider values
+    redraw();
+    if(originalImageFile){
+      currentObjectURL=URL.createObjectURL(originalImageFile);
+      imgOrigEl.src=currentObjectURL; currentFile=originalImageFile;
+    } else {
+      imgOrigEl.src=originalImageSrc; currentFile=null;
+    }
+    imgEditEl.style.opacity = '0'; // Hide until server processes
+    editedSdrBlockEl.style.display = 'none'; // Hide SDR preview too
+    imgEditEl.src=imgOrigEl.src;
+    for(const c of ['r','g','b']){ undoStacks[c]=[]; redoStacks[c]=[]; }
+    pushUndoAll(); setStatus('Reset to original');
+    schedule();
+  });
+
+  undoEl.addEventListener('click',undo);
+  redoEl.addEventListener('click',redo);
+  numPtsEl.addEventListener('input',()=>{ 
+    rebuildPoints(); 
+    updateBaseBuffer(); 
+    redraw(); 
+  });
+  sigmaPxEl.addEventListener('input',()=>{
+    sigmaPxValEl.textContent = sigmaPxEl.value;
+  });
+
+  // Keyboard shortcut: R to reset all
+  document.addEventListener('keydown', (e) => {
+    // Only trigger on R key
+    if (e.key === 'r' || e.key === 'R') {
+      // Blur any focused element (sliders, inputs, etc.) so they don't capture the key
+      if (document.activeElement) {
+        document.activeElement.blur();
+      }
+      e.preventDefault();
+      resetAllEl.click();
+      console.log('Reset all triggered by keyboard shortcut (R)');
+    }
+  });
+
+  document.addEventListener("DOMContentLoaded", () => {
+  const menuCheckEl = document.getElementById("menuCheck");
+  if (menuCheckEl) {
+    menuCheckEl.checked = false;   // make sure it's off
+    menuCheckEl.dispatchEvent(new Event("change")); // run your hide/show logic
+  }
+});
+
+  (function init(){ setImageAndComputeHists('/static/yellowFlower.jpg',null); })();
+
+  function runTests(){
+    const tests=[],log=(n,p)=>tests.push({name:n,pass:p});
+    const dummyCanvas=document.createElement('canvas'); dummyCanvas.width=512; dummyCanvas.height=168; dummyCanvas._dragYMax=100;
+    const P=[{x:128,y:50},{x:100,y:20}], md={x:128,y:80}, cur={x:176,y:60};
+    const out=applyPointBrush(P,dummyCanvas,md,cur);
+    log('applyPointBrush same length', out.length===P.length);
+    log('applyPointBrush modifies y', Math.abs(out[0].y-P[0].y)>0 || Math.abs(out[1].y-P[1].y)>0);
+    const H=pointsToHist([{x:0,y:0},{x:127,y:100}]); const P2=buildPointsFromHist(H,16), H2=pointsToHist(P2);
+    let diff=0; for(let i=0;i<128;i++) diff+=Math.abs(H[i]-H2[i]);
+    log('points<->hist approx', diff<5);
+    const pass=tests.filter(t=>t.pass).length,total=tests.length;
+    if(testSummaryEl) testSummaryEl.textContent=` — ${pass}/${total} passed`;
+    if(testOutputEl) testOutputEl.textContent=tests.map((t,i)=>`${t.pass?'✅':'❌'} ${i+1}. ${t.name}`).join('\n');
+  }
+  runTests();
+})();
+</script>
+</body>
+</html>

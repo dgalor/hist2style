@@ -3,6 +3,17 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script>
+    // Hide the page parts before the first paint; static/js/index.js reveals them one at a time (and if it never runs, they show after 4 s).
+    if ('IntersectionObserver' in window) {
+      document.documentElement.classList.add('parts-js');
+      setTimeout(function() {
+        if (window.partsReady) return;
+        document.documentElement.classList.remove('parts-js');
+        document.querySelectorAll('.abstract-section').forEach(function(s) { s.classList.add('is-revealed'); });
+      }, 4000);
+    }
+  </script>
 
   <meta name="title" content="Hist2Style: Histogram-Guided Stylization">
   <meta name="description" content="Hist2Style distills large image editing models into a lightweight bilateral-grid network for real-time, high-resolution photorealistic style transfer with interactive histogram control.">
@@ -26,8 +37,12 @@
   <link rel="icon" type="image/png" href="static/images/favicon-lion.png">
   <link rel="apple-touch-icon" href="static/images/favicon-lion.png">
 
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400..800&display=swap">
   <link rel="stylesheet" href="static/css/bulma.min.css">
   <link rel="stylesheet" href="static/css/index.css">
+  <link rel="preload" as="image" href="https://img.youtube.com/vi/Rhn7tVxEfcA/sddefault.jpg">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
 
   <script defer src="static/js/index.js"></script>
@@ -39,7 +54,7 @@
   </button>
 
   <main id="main-content">
-    <section class="hero">
+    <section class="hero page-part" id="top" data-label="Hist2Style">
       <div class="hero-body">
         <div class="container is-max-desktop">
           <div class="columns is-centered">
@@ -79,21 +94,54 @@
                     <span>Code</span>
                   </a>
                 </span>
+                <span class="link-block">
+                  <a href="https://github.com/dgalor/hist2style/blob/main/download_data.py" target="_blank" rel="noopener noreferrer" class="external-link button is-normal is-rounded is-dark">
+                    <span class="icon"><i class="fa-solid fa-database"></i></span>
+                    <span>Data</span>
+                  </a>
+                </span>
               </div>
+            </div>
+          </div>
+          <div class="title-video">
+            <div class="publication-video" style="background-image: url('https://img.youtube.com/vi/Rhn7tVxEfcA/sddefault.jpg')">
+              <iframe
+                data-src="https://www.youtube.com/embed/Rhn7tVxEfcA?rel=0&amp;enablejsapi=1"
+                title="Hist2Style Demo Video"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowfullscreen
+                loading="lazy"
+                referrerpolicy="strict-origin-when-cross-origin"></iframe>
+              <a
+                class="video-fallback is-hidden"
+                href="https://youtu.be/Rhn7tVxEfcA"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Watch the Hist2Style demo video on YouTube">
+                <img
+                  src="https://img.youtube.com/vi/Rhn7tVxEfcA/hqdefault.jpg"
+                  alt="Hist2Style demo video thumbnail"
+                  loading="lazy">
+                <span class="video-play-button" aria-hidden="true">
+                  <i class="fa-brands fa-youtube"></i>
+                  <span>Play on YouTube</span>
+                </span>
+              </a>
             </div>
           </div>
         </div>
       </div>
+      <a class="part-next" href="#video" aria-label="Scroll to the video"><i class="fa-solid fa-chevron-down"></i></a>
     </section>
 
-    <section class="section video-section" id="video">
+    <section class="section video-section page-part" id="video" data-label="Video">
       <div class="container is-max-desktop">
         <div class="columns is-centered">
           <div class="column is-10">
-            <div class="publication-video" id="publication-video">
+            <div class="publication-video" id="publication-video" style="background-image: url('https://img.youtube.com/vi/1nLah176p0s/maxresdefault.jpg')">
               <iframe
                 id="youtube-embed"
-                data-src="https://www.youtube.com/embed/1nLah176p0s?rel=0"
+                data-src="https://www.youtube.com/embed/1nLah176p0s?rel=0&amp;enablejsapi=1"
                 title="Hist2Style: Histogram-Guided Stylization"
                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
                 allowfullscreen
@@ -125,32 +173,32 @@
       </div>
     </section>
 
-    <section class="section hero is-light abstract-section" id="abstract">
+    <section class="section hero is-light abstract-section page-part" id="abstract" data-label="Abstract and key contributions">
       <div class="container is-max-desktop">
         <div class="columns is-centered has-text-centered">
           <div class="column is-four-fifths">
             <h2 class="title is-3 abstract-heading">Abstract</h2>
-            <div class="content has-text-justified abstract-body">
+            <div class="content has-text-justified has-text-left-mobile abstract-body">
               <p>
                 Photorealistic style transfer aims to match the color and tone of an input image to that of a style target while preserving content and fine details. Existing large image-editing models can perform stylization, but their computational cost, hallucinations, and limited precision control make them impractical for high-resolution, interactive workflows. Hist2Style addresses this by distilling a large editor into a lightweight model constrained to locally affine transformations in bilateral space. The model conditions on a histogram-based style embedding, enabling an interpretable and editable interface for color and tone control. Hist2Style delivers real-time, high-resolution photorealistic stylization, avoids structural drift by construction, and supports interactive user-guided adjustments.
               </p>
+            </div>
+            <div class="contributions-block" id="contributions">
+              <h2 class="title is-3">Key Contributions</h2>
+              <div class="content has-text-left">
+                <ul>
+                  <li>A photorealistic, histogram-guided stylization network that is robust to hallucinations and scales to high resolutions.</li>
+                  <li>An interactive real-time editing framework with direct histogram manipulation for intuitive control of color and tone.</li>
+                  <li>A Stylization Quality Assessment (SQA) metric that correlates strongly with human preference.</li>
+                </ul>
+              </div>
             </div>
           </div>
         </div>
       </div>
     </section>
 
-    <section class="section">
-      <div class="container is-max-desktop content">
-        <h2 class="title is-3 has-text-centered">Key Contributions</h2>
-        <ul>
-          <li>A photorealistic, histogram-guided stylization network that is robust to hallucinations and scales to high resolutions.</li>
-          <li>An interactive real-time editing framework with direct histogram manipulation for intuitive control of color and tone.</li>
-          <li>A Stylization Quality Assessment (SQA) metric that correlates strongly with human preference.</li>
-        </ul>
-      </div>
-    </section>
-
+    <div class="page-part" id="end" data-label="BibTeX">
     <section class="section" id="BibTeX">
       <div class="container is-max-desktop content">
         <div class="bibtex-header">
@@ -170,6 +218,7 @@
 }</code></pre>
       </div>
     </section>
+    </div>
   </main>
 
   <footer class="footer">

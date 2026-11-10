@@ -951,3 +951,55 @@ a:focus {
     height: auto;
   }
 }
+
+/* ---- One part per screen: gentle scroll anchoring, a calm fade-in as each part arrives, quiet section dots ---- */
+.page-part { position: relative; min-height: 100vh; min-height: 100svh; display: flex; flex-direction: column; justify-content: center; }
+.page-part > .container, .page-part > .hero-body { flex-grow: 0; width: 100%; }  /* Bulma lets these grow; here they keep their own height and are centred */
+#end.page-part { min-height: calc(100vh - var(--footer-h, 0px)); min-height: calc(100svh - var(--footer-h, 0px)); }  /* last screen: BibTeX + footer */
+.contributions-block { margin-top: 2.5rem; }  /* key contributions share the abstract's screen */
+.contributions-block .content { font-size: 1.1rem; line-height: 1.8; color: var(--text-secondary); }  /* same text style as the abstract above (.content.has-text-justified) */
+.contributions-block .content ul { margin-left: 1.15em; margin-top: 0; }  /* bullets line up with the abstract's left edge */
+@media (max-width: 768px) { .scroll-to-top { display: none; } }  /* phones: it sat on top of the text */
+.title-video { width: min(100%, max(22rem, calc((100vh - var(--title-h, 14.5rem) - var(--hero-reserve, 10rem)) * 16 / 9))); width: min(100%, max(22rem, calc((100svh - var(--title-h, 14.5rem) - var(--hero-reserve, 10rem)) * 16 / 9))); margin: 1.75rem auto 0; }  /* the demo video fills what the title block (--title-h, measured by index.js) leaves of the first screen */
+#top.page-part > .hero-body { padding-bottom: 4rem; }  /* room for the chevron inside the centred block */
+@media (max-width: 1100px) {  /* below this the one-line author list (1015 px) widened the title column past the screen and the title got clipped (also on the public site) */
+  .hero .column { min-width: 0; }
+  .hero .publication-authors-names { white-space: normal; overflow-x: visible; text-wrap: balance; }  /* even lines when it wraps */
+}
+@media (max-width: 768px) { .title-video { width: 100%; } }  /* phones: full width (the title block is too tall to size the video by height) */
+@media (max-height: 760px) {  /* shorter screens: the abstract + key contributions still fit one screen (spacing only; type untouched) */
+  #abstract.page-part { padding-top: 1.5rem; padding-bottom: 1.5rem; }
+  #abstract .title.is-3 { margin-bottom: 1rem; }
+  #abstract .abstract-body { margin-bottom: 0.75rem; }
+  .contributions-block { margin-top: 1.5rem; }
+}
+@media (max-height: 760px) and (min-width: 769px) { #abstract .column.is-four-fifths { flex: none; width: 91.66667%; } }  /* a slightly longer line (~100 characters) instead of smaller type */
+@media (max-height: 700px) {  /* 1366x657 / 1280x650 laptops */
+  #abstract.page-part { padding-top: 0.75rem; padding-bottom: 0.75rem; }
+  #abstract .title.is-3 { margin-bottom: 0.75rem; }
+  .contributions-block { margin-top: 1.25rem; }
+}
+.publication-video { background-color: #000; background-position: center; background-size: cover; background-repeat: no-repeat; }  /* thumbnail until the player loads */
+.parts-js .publication-video iframe { opacity: 0; transition: opacity 0.6s ease-out; }
+.parts-js .publication-video iframe.is-loaded { opacity: 1; }  /* the player fades in over its thumbnail */
+.parts-js .footer { transition: opacity 0.7s ease-out; }
+.parts-js .footer:not(.is-visible) { opacity: 0; }  /* the footer arrives with the last part (opacity only: a transform would add scroll height) */
+.parts-js .hero, .parts-js .section { animation: none; }  /* each part fades in on arrival; the template's page-load fadeInUp would run on top of it */
+.video-section.page-part .container.is-max-desktop { max-width: min(1152px, calc((100vh - 8rem) * 16 / 9)); max-width: min(1152px, calc((100svh - 8rem) * 16 / 9)); }
+.video-section.page-part .column.is-10 { flex: none; width: 100%; }
+.parts-js .page-part > * { transition: opacity 0.7s ease-out, transform 0.7s ease-out; }
+.parts-js .page-part:not(.is-visible) > *:not(.part-next) { opacity: 0; transform: translateY(12px); }
+.part-next { position: absolute; left: 50%; bottom: 1.5rem; transform: translateX(-50%); color: var(--text-secondary); opacity: 0.5; font-size: 1.1rem; transition: opacity 0.3s; }
+.part-next:hover { opacity: 0.9; color: var(--text-secondary); }
+.part-dots { position: fixed; right: 1.25rem; top: 50%; transform: translateY(-50%); display: flex; flex-direction: column; gap: 0.75rem; z-index: 30; }
+.part-dots a { display: block; width: 8px; height: 8px; border-radius: 50%; background: var(--text-primary); opacity: 0.15; transition: opacity 0.3s, transform 0.3s; }
+.part-dots a:hover { opacity: 0.4; }
+.part-dots a.is-active { opacity: 0.6; transform: scale(1.3); }
+@media (max-width: 768px) { .part-dots { display: none; } }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto; }
+  .parts-js .page-part > * { transition: none; }
+  .parts-js .page-part:not(.is-visible) > *:not(.part-next) { opacity: 1; transform: none; }
+  .parts-js .publication-video iframe, .parts-js .footer { transition: none; }
+  .parts-js .footer:not(.is-visible) { opacity: 1; }
+}

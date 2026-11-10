@@ -205,3 +205,22 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Hist2Style: downloaded data and generated outputs (never in git)
+data
+checkpoints/
+outputs/
+eval_table/
+cache/
+utils/sqa_results/
+*.tar
+*.zip
+
+# OS junk
+.DS_Store
+__MACOSX/
+._*
+
+# checkpoints: only the released one is tracked
+*.ckpt
+!demo/model-epoch=1500-val_loss=2.79.ckpt
